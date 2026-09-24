@@ -84,6 +84,7 @@ fun KenshoPocketApp(viewModel: MainViewModel, notifications: NotificationViewMod
     val current by nav.currentBackStackEntryAsState()
     val notification by viewModel.notificationRequest.collectAsState()
     val notificationScope = rememberCoroutineScope()
+    val showBottomBar = current?.destination?.route in setOf(TODAY, LIST, WINS, MORE)
     LaunchedEffect(notification, current?.destination?.route) {
         // Keep an active editor and its input intact; handle the notification after leaving it.
         val route = current?.destination?.route
@@ -103,16 +104,16 @@ fun KenshoPocketApp(viewModel: MainViewModel, notifications: NotificationViewMod
         Scaffold(
             snackbarHost = { SnackbarHost(snackbar) },
             bottomBar = {
-                NavigationBar {
+                if (showBottomBar) NavigationBar {
                     listOf(TODAY to Icons.Default.Home, LIST to Icons.Default.List, WINS to Icons.Default.CardGiftcard, MORE to Icons.Default.MoreHoriz).forEach { (route, icon) ->
-                        NavigationBarItem(
-                            selected = current?.destination?.route == route,
-                            onClick = { nav.navigate(route) { popUpTo(TODAY) { saveState = true }; launchSingleTop = true; restoreState = true } },
-                            icon = { Icon(icon, contentDescription = null) },
-                            label = { Text(when(route) { TODAY -> "今日"; LIST -> "一覧"; WINS -> "当選"; else -> "その他" }) },
-                        )
+                            NavigationBarItem(
+                                selected = current?.destination?.route == route,
+                                onClick = { nav.navigate(route) { popUpTo(TODAY) { saveState = true }; launchSingleTop = true; restoreState = true } },
+                                icon = { Icon(icon, contentDescription = null) },
+                                label = { Text(when(route) { TODAY -> "今日"; LIST -> "一覧"; WINS -> "当選"; else -> "その他" }) },
+                            )
+                        }
                     }
-                }
             },
         ) { padding ->
             NavHost(navController = nav, startDestination = TODAY, modifier = Modifier.padding(padding)) {
@@ -197,7 +198,8 @@ private fun EditScreen(initialDraft: EditDraft?, onBack: (EditDraft) -> Unit, on
     }
     DisposableEffect(owner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP && !suppressDraftOnStop.get() && currentDraft.title.isNotBlank()) onBack(currentDraft)
+            val hasInput = currentDraft.title.isNotBlank() || currentDraft.url.isNotBlank() || currentDraft.deadline.isNotBlank()
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP && !suppressDraftOnStop.get() && hasInput) onBack(currentDraft)
         }
         owner.lifecycle.addObserver(observer)
         onDispose { owner.lifecycle.removeObserver(observer) }

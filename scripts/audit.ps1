@@ -51,23 +51,40 @@ if ($forbiddenFiles.Count -gt 0) {
 if ($SkipGradle) {
     $blocked.Add('Gradle検証はSkipGradle指定で未実行です。')
 } else {
-    $java = Get-Command java -ErrorAction SilentlyContinue
-    if ($null -eq $java -and $env:JAVA_HOME) {
-        $javaHomeJava = Join-Path $env:JAVA_HOME 'bin\java.exe'
-        if (Test-Path -LiteralPath $javaHomeJava) {
-            $env:Path = "$(Split-Path -Parent $javaHomeJava);$env:Path"
-            $java = Get-Command java -ErrorAction SilentlyContinue
+    $buildScript = Join-Path $repo 'build.ps1'
+    if (Test-Path -LiteralPath $buildScript) {
+        try {
+            # build.ps1 owns the non-ASCII workspace junction, bundled JDK, SDK and
+            # writable Gradle homes. Calling gradlew directly here can produce a false
+            # failure before Android Gradle Plugin reaches the actual source checks.
+            & $buildScript -Tasks @('testDebugUnitTest', 'lintDebug', 'assembleDebug')
+            if ($LASTEXITCODE -ne 0) {
+                $findings.Add("Gradle検証が失敗しました（exit=$LASTEXITCODE）。ログを保存して原因を修正してください。")
+            } else {
+                Write-Output 'GRADLE=PASS'
+            }
+        } catch {
+            $findings.Add("Gradle検証が例外で停止しました: $($_.Exception.Message)")
         }
-    }
-    if ($null -eq $java) {
-        $blocked.Add('JDKがPATHまたはJAVA_HOMEにありません。Gradle検証を実行できません。')
     } else {
-    & cmd /c gradlew.bat testDebugUnitTest lintDebug assembleDebug --stacktrace --no-daemon
-    if ($LASTEXITCODE -ne 0) {
-        $findings.Add("Gradle検証が失敗しました（exit=$LASTEXITCODE）。ログを保存して原因を修正してください。")
-    } else {
-        Write-Output 'GRADLE=PASS'
-    }
+        $java = Get-Command java -ErrorAction SilentlyContinue
+        if ($null -eq $java -and $env:JAVA_HOME) {
+            $javaHomeJava = Join-Path $env:JAVA_HOME 'bin\java.exe'
+            if (Test-Path -LiteralPath $javaHomeJava) {
+                $env:Path = "$(Split-Path -Parent $javaHomeJava);$env:Path"
+                $java = Get-Command java -ErrorAction SilentlyContinue
+            }
+        }
+        if ($null -eq $java) {
+            $blocked.Add('JDKがPATHまたはJAVA_HOMEにありません。Gradle検証を実行できません。')
+        } else {
+            & cmd /c gradlew.bat testDebugUnitTest lintDebug assembleDebug --stacktrace --no-daemon
+            if ($LASTEXITCODE -ne 0) {
+                $findings.Add("Gradle検証が失敗しました（exit=$LASTEXITCODE）。ログを保存して原因を修正してください。")
+            } else {
+                Write-Output 'GRADLE=PASS'
+            }
+        }
     }
 }
 

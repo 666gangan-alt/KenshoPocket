@@ -34,6 +34,8 @@ class ShareImportActivity : ComponentActivity() {
     private var commitStarted = false
     private var finishing = false
     private lateinit var draftId: String
+    private val hasDraftContent: Boolean
+        get() = sharedText.isNotBlank() || candidates.isNotEmpty()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,7 +50,7 @@ class ShareImportActivity : ComponentActivity() {
                 finishing = true
                 lifecycleScope.launch {
                     runCatching {
-                        if (!suppressDraftOnStop && sharedText.isNotBlank()) saveDraftNow()
+                        if (!suppressDraftOnStop && hasDraftContent) saveDraftNow()
                     }.onSuccess { suppressDraftOnStop = true; finish() }
                         .onFailure { finishing = false; error = "下書きを保存できません: ${it.message}" }
                 }
@@ -77,7 +79,7 @@ class ShareImportActivity : ComponentActivity() {
     }
 
     override fun onStop() {
-        if (!isFinishing && !suppressDraftOnStop && sharedText.isNotBlank()) saveDraft()
+        if (!isFinishing && !suppressDraftOnStop && hasDraftContent) saveDraft()
         super.onStop()
     }
 
@@ -193,9 +195,12 @@ class ShareImportActivity : ComponentActivity() {
 
     private fun decodeDraft(payload: String): Pair<String, List<ReviewCandidate>>? = runCatching {
         val json = JSONObject(payload)
-        if (json.optString("kind") != "SHARED_IMPORT") return@runCatching null
-        json.optString("text") to decodeCandidates(json.optJSONArray("candidates") ?: JSONArray())
-    }.getOrNull()
+        when (json.optString("kind")) {
+            "SHARED_IMPORT" -> json.optString("text") to decodeCandidates(json.optJSONArray("candidates") ?: JSONArray())
+            "MANUAL_CAMPAIGN" -> null
+            else -> decodeLegacySharedText(payload)?.let { it to emptyList() }
+        }
+    }.getOrElse { decodeLegacySharedText(payload)?.let { it to emptyList() } }
 
     private fun decodeCandidates(payload: String): List<ReviewCandidate> = runCatching { decodeCandidates(JSONArray(payload)) }.getOrDefault(emptyList())
 
@@ -221,6 +226,13 @@ class ShareImportActivity : ComponentActivity() {
             }
         }
     }
+}
+
+/** Payloads before the structured shared-import format were raw text in DraftEntity. */
+internal fun decodeLegacySharedText(payload: String): String? {
+    if (payload.isBlank()) return null
+    val kind = runCatching { JSONObject(payload).optString("kind") }.getOrNull()
+    return payload.takeUnless { kind in setOf("MANUAL_CAMPAIGN", "SHARED_IMPORT") }
 }
 
 private data class ReviewCandidate(val key: String, val value: ImportCandidate, val selected: Boolean = true, val deadlineConfirmed: Boolean = false)
