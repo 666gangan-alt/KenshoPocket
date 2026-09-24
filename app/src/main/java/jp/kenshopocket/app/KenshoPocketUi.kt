@@ -1,5 +1,6 @@
 package jp.kenshopocket.app
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -201,7 +202,12 @@ private fun EditScreen(initialDraft: EditDraft?, onBack: (EditDraft) -> Unit, on
         owner.lifecycle.addObserver(observer)
         onDispose { owner.lifecycle.removeObserver(observer) }
     }
-    Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.add_campaign)) }, navigationIcon = { IconButton(onClick = { suppressDraftOnStop.set(true); onBack(currentDraft) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "戻る") } }) }, bottomBar = { Button(onClick = { if (title.isBlank()) error = "懸賞名を入力してください" else onSave(title, url, deadline.ifBlank { null }) { suppressDraftOnStop.set(true) } }, modifier = Modifier.fillMaxWidth().padding(16.dp).height(56.dp)) { Text(stringResource(R.string.save)) } }) { padding ->
+    // NavHost back gestures pop only the route; the Activity may stay STARTED, so ON_STOP is
+    // not a reliable draft boundary. Consume the back invocation at the editor itself.
+    BackHandler {
+        if (suppressDraftOnStop.compareAndSet(false, true)) onBack(currentDraft)
+    }
+    Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.add_campaign)) }, navigationIcon = { IconButton(onClick = { if (suppressDraftOnStop.compareAndSet(false, true)) onBack(currentDraft) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "戻る") } }) }, bottomBar = { Button(onClick = { if (title.isBlank()) error = "懸賞名を入力してください" else onSave(title, url, deadline.ifBlank { null }) { suppressDraftOnStop.set(true) } }, modifier = Modifier.fillMaxWidth().padding(16.dp).height(56.dp)) { Text(stringResource(R.string.save)) } }) { padding ->
         Column(Modifier.padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             OutlinedTextField(title, { title = it; error = null }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.campaign_title)) }, isError = error != null, supportingText = { error?.let { Text(it) } })
             OutlinedTextField(url, { url = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.application_url)) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri))
