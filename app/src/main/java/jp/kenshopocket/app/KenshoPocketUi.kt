@@ -40,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -48,8 +49,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -63,6 +66,7 @@ import jp.kenshopocket.app.feature.notification.NotificationViewModel
 import androidx.navigation.navArgument
 import jp.kenshopocket.app.data.CampaignCard
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 
 private const val TODAY = "today"
 private const val LIST = "list"
@@ -118,7 +122,14 @@ fun KenshoPocketApp(viewModel: MainViewModel, notifications: NotificationViewMod
                 composable("notifications/{id}", arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
                     NotificationScreen(notifications, entry.arguments?.getString("id")) { nav.popBackStack() }
                 }
-                composable("edit") { EditScreen(onBack = { nav.popBackStack() }, onSave = { title, url, deadline -> viewModel.addCampaign(title, url, deadline) { nav.popBackStack() } }) }
+                composable("edit") {
+                    LaunchedEffect(Unit) { viewModel.loadEditDraft() }
+                    EditScreen(
+                        initialDraft = viewModel.editDraft.collectAsState().value,
+                        onBack = { draft -> viewModel.saveEditDraft(draft.title, draft.url, draft.deadline); nav.popBackStack() },
+                        onSave = { title, url, deadline, saved -> viewModel.addCampaign(title, url, deadline) { saved(); nav.popBackStack() } },
+                    )
+                }
                 composable("detail/{id}", arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
                     val id = entry.arguments?.getString("id") ?: return@composable
                     val card = cards.firstOrNull { it.campaign.id == id }
@@ -168,12 +179,29 @@ private fun CampaignCardView(card: CampaignCard, detail: () -> Unit, open: suspe
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun EditScreen(onBack: () -> Unit, onSave: (String, String, String?) -> Unit) {
+private fun EditScreen(initialDraft: EditDraft?, onBack: (EditDraft) -> Unit, onSave: (String, String, String?, () -> Unit) -> Unit) {
+    val owner = LocalLifecycleOwner.current
     var title by rememberSaveable { mutableStateOf("") }
     var url by rememberSaveable { mutableStateOf("") }
     var deadline by rememberSaveable { mutableStateOf("") }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
-    Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.add_campaign)) }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "戻る") } }) }, bottomBar = { Button(onClick = { if (title.isBlank()) error = "懸賞名を入力してください" else onSave(title, url, deadline.ifBlank { null }) }, modifier = Modifier.fillMaxWidth().padding(16.dp).height(56.dp)) { Text(stringResource(R.string.save)) } }) { padding ->
+    val suppressDraftOnStop = remember { AtomicBoolean(false) }
+    val currentDraft by rememberUpdatedState(EditDraft(initialDraft?.id ?: "", title, url, deadline))
+    LaunchedEffect(initialDraft) {
+        if (initialDraft != null && title.isBlank() && url.isBlank() && deadline.isBlank()) {
+            title = initialDraft.title
+            url = initialDraft.url
+            deadline = initialDraft.deadline
+        }
+    }
+    DisposableEffect(owner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP && !suppressDraftOnStop.get() && currentDraft.title.isNotBlank()) onBack(currentDraft)
+        }
+        owner.lifecycle.addObserver(observer)
+        onDispose { owner.lifecycle.removeObserver(observer) }
+    }
+    Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.add_campaign)) }, navigationIcon = { IconButton(onClick = { suppressDraftOnStop.set(true); onBack(currentDraft) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "戻る") } }) }, bottomBar = { Button(onClick = { if (title.isBlank()) error = "懸賞名を入力してください" else onSave(title, url, deadline.ifBlank { null }) { suppressDraftOnStop.set(true) } }, modifier = Modifier.fillMaxWidth().padding(16.dp).height(56.dp)) { Text(stringResource(R.string.save)) } }) { padding ->
         Column(Modifier.padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             OutlinedTextField(title, { title = it; error = null }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.campaign_title)) }, isError = error != null, supportingText = { error?.let { Text(it) } })
             OutlinedTextField(url, { url = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.application_url)) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri))
@@ -193,7 +221,8 @@ private fun DetailScreen(card: CampaignCard?, back: () -> Unit, notifications: (
                 Text(card.campaign.deadlineDate ?: "締切未設定・要確認")
                 if (!card.campaign.deadlineConfirmed) Text(stringResource(R.string.reminder_unconfirmed))
                 OutlinedNotificationButton(notifications)
-                if (card.url != null) Button(onClick = { scope.launch { open() } }, Modifier.fillMaxWidth().height(56.dp)) { Text(stringResource(R.string.open_application)) }
+                if (card.url != null && !card.url.reviewRequired) Button(onClick = { scope.launch { open() } }, Modifier.fillMaxWidth().height(56.dp)) { Text(stringResource(R.string.open_application)) }
+                else if (card.url != null) Text(stringResource(R.string.url_review_required), color = MaterialTheme.colorScheme.error)
                 Text("応募履歴: ${card.entryCount}件")
             }
         }

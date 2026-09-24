@@ -51,10 +51,18 @@ class CampaignRepository(private val db: AppDatabase, private val clock: Clock =
         onChanged()
     }
 
-    suspend fun commitImport(candidates: List<ImportCandidate>, confirmedDeadlineIndexes: Set<Int>) {
+    suspend fun commitImport(
+        candidates: List<ImportCandidate>,
+        confirmedDeadlineIndexes: Set<Int>,
+        operationId: String = UUID.randomUUID().toString(),
+    ) {
         require(candidates.isNotEmpty()) { "保存する候補を選んでください" }
-        val operationId = UUID.randomUUID().toString()
+        require(operationId.length <= 200) { "インポート操作IDが長すぎます" }
+        val operationNote = "import:$operationId"
         db.withTransaction {
+            // Room serializes transactions, so the check and the inserts are one idempotent
+            // operation even when a retry races a process-restart recovery.
+            if (dao.campaignsWithNote(operationNote) > 0) return@withTransaction
             candidates.forEachIndexed { index, candidate ->
                 require(candidate.title.isNotBlank() && candidate.title.length <= 200)
                 val now = clock.millis()
@@ -69,7 +77,7 @@ class CampaignRepository(private val db: AppDatabase, private val clock: Clock =
                     deadlineConfirmed = confirmed,
                     entryMode = candidate.entryModeCandidate,
                     verificationStatus = if (candidate.warnings.isEmpty() && confirmed) "USER_REVIEWED" else "NEEDS_REVIEW",
-                    note = "import:$operationId",
+                    note = operationNote,
                     createdAt = now,
                     updatedAt = now,
                 )
@@ -106,8 +114,18 @@ class CampaignRepository(private val db: AppDatabase, private val clock: Clock =
         return session
     }
 
+    suspend fun launch(id: String): LaunchSessionEntity? = dao.launch(id)
+
     suspend fun markLaunchForReview(id: String) = dao.updateLaunch(id, "REVIEW_LATER", null, clock.millis())
-    suspend fun markNotApplied(id: String) = dao.updateLaunch(id, "NOT_APPLIED", null, clock.millis())
+    suspend fun markNotApplied(id: String) {
+        val launch = dao.launch(id) ?: return
+        val now = clock.millis()
+        db.withTransaction {
+            dao.updateLaunch(id, "NOT_APPLIED", null, now)
+            dao.closeOtherPendingLaunches(launch.campaignId, id, now)
+        }
+        onChanged()
+    }
 
     suspend fun confirmApplied(launchId: String, mutationId: String = UUID.randomUUID().toString()): EntryRecordEntity = db.withTransaction {
         dao.entryByMutation(mutationId)?.let { return@withTransaction it }
@@ -124,6 +142,7 @@ class CampaignRepository(private val db: AppDatabase, private val clock: Clock =
                 existing.first { it.appliedAt >= bounds.start.toEpochMilli() && it.appliedAt < bounds.end.toEpochMilli() }
             }
             dao.updateLaunch(launch.id, "CONFIRMED", found.id, now)
+            dao.closeOtherPendingLaunches(launch.campaignId, launch.id, now)
             return@withTransaction found
         }
         val period = periodKey(rule, Instant.ofEpochMilli(now))
@@ -132,12 +151,16 @@ class CampaignRepository(private val db: AppDatabase, private val clock: Clock =
         val inserted = dao.insertEntry(entry)
         require(inserted != -1L) { "この期間は応募済みです" }
         dao.updateLaunch(launch.id, "CONFIRMED", entry.id, now)
+        dao.closeOtherPendingLaunches(launch.campaignId, launch.id, now)
         entry
     }.also { onChanged() }
 
     suspend fun saveDraft(id: String, payload: String) = dao.saveDraft(DraftEntity(id, "CAMPAIGN_NEW", null, payload, clock.millis()))
     suspend fun latestDraft() = dao.latestNewDraft()
+    suspend fun drafts() = dao.allNewDrafts()
     suspend fun deleteDraft(id: String) = dao.deleteDraft(id)
+
+    suspend fun pendingLaunches() = dao.pendingLaunches()
 
     private fun periodKey(rule: EntryRuleEntity, at: Instant): String = when (rule.mode) {
         "ONCE" -> "ONCE"

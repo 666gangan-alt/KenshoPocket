@@ -51,7 +51,10 @@ class ReminderEngine(private val db: AppDatabase, private val gateway: ReminderG
                 complete(occurrence, "CANCELLED", invalid, now)
             } else if (occurrence.state != "POSTED" && occurrence.effectiveAt <= now.toEpochMilli()) {
                 if (occurrence.state.startsWith("BLOCKED_")) complete(occurrence, "SKIPPED", "SKIPPED_PAST_ON_RECONCILE", now)
-                else if (dispatchDue || occurrence.state == "POSTING") due += occurrence
+                // SCHEDULED means the OS already accepted this exact occurrence. A foreground
+                // reconcile can race the alarm receiver at the boundary, so keep the persisted
+                // schedule eligible for a late, idempotent dispatch just like POSTING.
+                else if (dispatchDue || occurrence.state in setOf("SCHEDULED", "POSTING")) due += occurrence
                 else complete(occurrence, "SKIPPED", "SKIPPED_PAST_ON_RECONCILE", now)
             }
         }

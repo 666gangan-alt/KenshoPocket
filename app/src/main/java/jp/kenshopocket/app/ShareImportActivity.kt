@@ -2,6 +2,7 @@ package jp.kenshopocket.app
 
 import android.content.Intent
 import android.os.Bundle
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -13,6 +14,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
+import org.json.JSONArray
+import org.json.JSONObject
+import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import java.util.UUID
 import jp.kenshopocket.app.domain.importer.ImportCandidate
@@ -25,6 +30,9 @@ class ShareImportActivity : ComponentActivity() {
     private var candidates by mutableStateOf<List<ReviewCandidate>>(emptyList())
     private var error by mutableStateOf<String?>(null)
     private var saving by mutableStateOf(false)
+    private var suppressDraftOnStop = false
+    private var commitStarted = false
+    private var finishing = false
     private lateinit var draftId: String
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,13 +41,29 @@ class ShareImportActivity : ComponentActivity() {
         draftId = savedInstanceState?.getString("draftId") ?: UUID.randomUUID().toString()
         sharedText = savedInstanceState?.getString("sharedText")
             ?: if (intent.action == Intent.ACTION_SEND) intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty().take(200_000) else ""
+        candidates = savedInstanceState?.getString("candidates")?.let(::decodeCandidates).orEmpty()
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (finishing || commitStarted) return
+                finishing = true
+                lifecycleScope.launch {
+                    runCatching {
+                        if (!suppressDraftOnStop && sharedText.isNotBlank()) saveDraftNow()
+                    }.onSuccess { suppressDraftOnStop = true; finish() }
+                        .onFailure { finishing = false; error = "下書きを保存できません: ${it.message}" }
+                }
+            }
+        })
         setContent { MaterialTheme { ImportContent() } }
         if (savedInstanceState == null && intent.action != Intent.ACTION_SEND && sharedText.isBlank()) {
             lifecycleScope.launch {
-                val draft = (application as KenshoPocketApplication).repository.latestDraft()
+                val draft = (application as KenshoPocketApplication).repository.drafts().asSequence()
+                    .mapNotNull { candidate -> decodeDraft(candidate.payloadJson)?.let { candidate.id to it } }
+                    .firstOrNull()
                 if (draft != null && sharedText.isBlank()) {
-                    draftId = draft.id
-                    sharedText = draft.payloadJson.take(200_000)
+                    draftId = draft.first
+                    sharedText = draft.second.first.take(200_000)
+                    candidates = draft.second.second
                 }
             }
         }
@@ -48,11 +72,12 @@ class ShareImportActivity : ComponentActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("draftId", draftId)
         outState.putString("sharedText", sharedText)
+        outState.putString("candidates", encodeCandidates(candidates))
         super.onSaveInstanceState(outState)
     }
 
     override fun onStop() {
-        if (!isFinishing && sharedText.isNotBlank()) saveDraft()
+        if (!isFinishing && !suppressDraftOnStop && sharedText.isNotBlank()) saveDraft()
         super.onStop()
     }
 
@@ -72,7 +97,7 @@ class ShareImportActivity : ComponentActivity() {
                     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = ::parseText, enabled = sharedText.isNotBlank()) { Text("候補を作る") }
-                        TextButton(onClick = { saveDraft(); finish() }) { Text("下書きに保存して戻る") }
+                        TextButton(onClick = ::saveAndFinish) { Text("下書きに保存して戻る") }
                     }
                     HorizontalDivider(Modifier.padding(vertical = 8.dp))
                 }
@@ -106,21 +131,95 @@ class ShareImportActivity : ComponentActivity() {
     }
 
     private fun commitSelected() {
+        if (commitStarted) return
         val selected = candidates.filter { it.selected }
         if (selected.any { it.value.title.isBlank() }) { error = "懸賞名が空の候補があります"; return }
+        commitStarted = true
         saving = true
         lifecycleScope.launch {
             val repository = (application as KenshoPocketApplication).repository
             runCatching {
-                repository.commitImport(selected.map { it.value }, selected.mapIndexedNotNull { index, value -> index.takeIf { value.deadlineConfirmed } }.toSet())
+                repository.commitImport(selected.map { it.value }, selected.mapIndexedNotNull { index, value -> index.takeIf { value.deadlineConfirmed } }.toSet(), draftId)
                 repository.deleteDraft(draftId)
-            }.onSuccess { finish() }.onFailure { error = it.message; saving = false }
+            }.onSuccess { suppressDraftOnStop = true; finishing = true; finish() }.onFailure { error = it.message; saving = false; commitStarted = false }
         }
     }
 
     private fun saveDraft() = lifecycleScope.launch {
-        runCatching { (application as KenshoPocketApplication).repository.saveDraft(draftId, sharedText) }
+        if (commitStarted) return@launch
+        runCatching { saveDraftNow() }
             .onFailure { error = "下書きを保存できません: ${it.message}" }
+    }
+
+    private fun saveAndFinish() {
+        if (finishing || commitStarted) return
+        finishing = true
+        lifecycleScope.launch {
+            runCatching { saveDraftNow() }
+                .onSuccess { suppressDraftOnStop = true; finish() }
+                .onFailure { finishing = false; error = "下書きを保存できません: ${it.message}" }
+        }
+    }
+
+    private suspend fun saveDraftNow() {
+        if (commitStarted) return
+        val repository = (application as KenshoPocketApplication).repository
+        repository.saveDraft(draftId, JSONObject().put("kind", "SHARED_IMPORT").put("text", sharedText).put("candidates", JSONArray(encodeCandidates(candidates))).toString())
+        // A parse-triggered save can overlap the commit coroutine. Remove a late write so a
+        // successful commit cannot resurrect the consumed draft after its delete.
+        if (commitStarted) repository.deleteDraft(draftId)
+    }
+
+    private fun encodeCandidates(values: List<ReviewCandidate>): String = JSONArray().apply {
+        values.forEach { item ->
+            val value = item.value
+            put(JSONObject().apply {
+                put("key", item.key)
+                put("selected", item.selected)
+                put("deadlineConfirmed", item.deadlineConfirmed)
+                put("title", value.title)
+                put("titleRequiresReview", value.titleRequiresReview)
+                put("date", value.dateCandidate?.toString() ?: "")
+                put("time", value.timeCandidate?.toString() ?: "")
+                put("launchUrl", value.launchUrlCandidate ?: "")
+                put("relatedUrls", JSONArray(value.relatedUrls))
+                put("urlReviewRequired", value.urlReviewRequired)
+                put("entryMode", value.entryModeCandidate)
+                put("warnings", JSONArray(value.warnings.toList()))
+                put("sourceText", value.sourceText)
+            })
+        }
+    }.toString()
+
+    private fun decodeDraft(payload: String): Pair<String, List<ReviewCandidate>>? = runCatching {
+        val json = JSONObject(payload)
+        if (json.optString("kind") != "SHARED_IMPORT") return@runCatching null
+        json.optString("text") to decodeCandidates(json.optJSONArray("candidates") ?: JSONArray())
+    }.getOrNull()
+
+    private fun decodeCandidates(payload: String): List<ReviewCandidate> = runCatching { decodeCandidates(JSONArray(payload)) }.getOrDefault(emptyList())
+
+    private fun decodeCandidates(array: JSONArray): List<ReviewCandidate> = buildList {
+        for (index in 0 until array.length()) {
+            val json = array.optJSONObject(index) ?: continue
+            runCatching {
+                val urls = json.optJSONArray("relatedUrls") ?: JSONArray()
+                val warnings = json.optJSONArray("warnings") ?: JSONArray()
+                val value = ImportCandidate(
+                    title = json.optString("title"),
+                    titleRequiresReview = json.optBoolean("titleRequiresReview"),
+                    dateCandidate = json.optString("date").takeIf { it.isNotBlank() }?.let(LocalDate::parse),
+                    timeCandidate = json.optString("time").takeIf { it.isNotBlank() }?.let(LocalTime::parse),
+                    launchUrlCandidate = json.optString("launchUrl").takeIf { it.isNotBlank() },
+                    relatedUrls = buildList { for (i in 0 until urls.length()) urls.optString(i).takeIf(String::isNotBlank)?.let(::add) },
+                    urlReviewRequired = json.optBoolean("urlReviewRequired"),
+                    entryModeCandidate = json.optString("entryMode", "ONCE"),
+                    warnings = buildSet { for (i in 0 until warnings.length()) warnings.optString(i).takeIf(String::isNotBlank)?.let(::add) },
+                    sourceText = json.optString("sourceText"),
+                )
+                add(ReviewCandidate(json.optString("key", UUID.randomUUID().toString()), value, json.optBoolean("selected", true), json.optBoolean("deadlineConfirmed")))
+            }
+        }
     }
 }
 

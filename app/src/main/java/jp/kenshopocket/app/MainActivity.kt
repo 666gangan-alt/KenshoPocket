@@ -1,7 +1,10 @@
 package jp.kenshopocket.app
 
 import android.os.Bundle
+import android.content.ClipData
 import android.content.Intent
+import android.content.ClipboardManager
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -25,8 +28,17 @@ class MainActivity : ComponentActivity() {
         setContent {
             KenshoPocketApp(viewModel, notifications) { campaignId, route ->
                 val launch = viewModel.prepareLaunch(campaignId, route) ?: return@KenshoPocketApp
-                runCatching { CustomTabsIntent.Builder().build().launchUrl(this, launch.urlSnapshot.toUri()) }
-                    .onFailure { viewModel.resolveConfirmation("NOT_APPLIED") }
+                try {
+                    CustomTabsIntent.Builder().build().launchUrl(this, launch.urlSnapshot.toUri())
+                } catch (_: RuntimeException) {
+                    try {
+                        startActivity(Intent(Intent.ACTION_VIEW, launch.urlSnapshot.toUri()))
+                    } catch (_: RuntimeException) {
+                        getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("応募URL", launch.urlSnapshot))
+                        viewModel.failPendingLaunch()
+                        Toast.makeText(this, "応募URLをコピーしました。対応するブラウザで開いてください。", Toast.LENGTH_LONG).show()
+                    }
+                }
             }
         }
     }

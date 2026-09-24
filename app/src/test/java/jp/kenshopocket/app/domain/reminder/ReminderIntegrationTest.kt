@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import java.time.*
 import jp.kenshopocket.app.data.*
+import jp.kenshopocket.app.domain.importer.ImportCandidate
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.first
 import org.junit.*
@@ -52,6 +53,17 @@ class ReminderIntegrationTest {
         engine.refresh(true); engine.refresh(true)
         assertEquals(setOf("c1", "c2"), gateway.posts.keys)
         assertEquals(2, gateway.postCalls)
+    }
+
+    @Test fun foregroundReconcileDoesNotDropAnAlreadyScheduledAlarmAtItsBoundary() = runBlocking {
+        campaign()
+        engine.refresh()
+        clock.at = Instant.parse("2026-09-24T00:00:05Z")
+        // The alarm receiver may be racing the activity/WorkManager reconcile. The persisted
+        // SCHEDULED marker is allowed to dispatch late, while a new PENDING plan is not.
+        engine.refresh()
+        assertEquals(1, gateway.postCalls)
+        assertEquals(1, db.reminderDao().occurrences().count { it.state == "POSTED" })
     }
 
     @Test fun unconfirmedDeadlineAndInferredRepeatingRuleNeverSchedule() = runBlocking {
@@ -191,6 +203,32 @@ class ReminderIntegrationTest {
         val tomorrow = repository.prepareLaunch("c1", "detail/c1")
         repository.confirmApplied(tomorrow.id, "m3")
         assertEquals(2, db.campaignDao().activeEntries("c1").size)
+    }
+
+    @Test fun resolvingTheLatestLaunchClosesOlderReviewLaterSessions() = runBlocking {
+        campaign()
+        db.campaignDao().insertUrl(CampaignUrlEntity("u", "c1", "https://example.invalid/apply", "https://example.invalid/apply", "u", createdAt = 1))
+        val repository = CampaignRepository(db, clock)
+        val first = repository.prepareLaunch("c1", "detail/c1")
+        repository.markLaunchForReview(first.id)
+        val latest = repository.prepareLaunch("c1", "detail/c1")
+        assertTrue(repository.card("c1")!!.pendingConfirmation)
+        repository.markNotApplied(latest.id)
+        assertFalse(repository.card("c1")!!.pendingConfirmation)
+        assertEquals("NOT_APPLIED", db.campaignDao().launch(first.id)!!.state)
+    }
+
+    @Test fun importRetryWithTheSameDraftOperationDoesNotDuplicateCampaigns() = runBlocking {
+        val candidate = ImportCandidate(
+            title = "再試行テスト", titleRequiresReview = false,
+            dateCandidate = LocalDate.of(2026, 9, 27), timeCandidate = null,
+            launchUrlCandidate = "https://example.invalid/apply", relatedUrls = listOf("https://example.invalid/apply"),
+            urlReviewRequired = false, sourceText = "再試行テスト https://example.invalid/apply",
+        )
+        val repository = CampaignRepository(db, clock)
+        repository.commitImport(listOf(candidate), emptySet(), "draft-operation")
+        repository.commitImport(listOf(candidate), emptySet(), "draft-operation")
+        assertEquals(1, db.campaignDao().allCampaigns().count { it.note == "import:draft-operation" })
     }
 
     @Test fun v1MigrationRetainsCampaignUrlDraftAndEntryAndValidatesRoomSchema() = runBlocking {

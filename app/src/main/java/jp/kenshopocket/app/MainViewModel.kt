@@ -8,11 +8,15 @@ import androidx.lifecycle.viewModelScope
 import jp.kenshopocket.app.data.CampaignCard
 import jp.kenshopocket.app.data.CampaignRepository
 import jp.kenshopocket.app.data.LaunchSessionEntity
+import org.json.JSONObject
+import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+data class EditDraft(val id: String, val title: String, val url: String, val deadline: String)
 
 class MainViewModel(
     private val repository: CampaignRepository,
@@ -21,6 +25,7 @@ class MainViewModel(
     val cards: StateFlow<List<CampaignCard>> = repository.observeCards().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val confirmation = MutableStateFlow<LaunchSessionEntity?>(null)
     val message = MutableStateFlow<String?>(null)
+    val editDraft = MutableStateFlow<EditDraft?>(null)
     val notificationRequest = savedState.getStateFlow<String?>("notificationKey", null)
     fun notification(key: String, action: String) {
         savedState["notificationKey"] = key
@@ -37,9 +42,36 @@ class MainViewModel(
     private var externalPageObserved = false
 
     fun addCampaign(title: String, url: String, deadline: String?, onDone: () -> Unit) = viewModelScope.launch {
-        runCatching { repository.addCampaign(title, url, deadline) }
-            .onSuccess { onDone() }
-            .onFailure { message.value = it.message }
+        try {
+            repository.addCampaign(title, url, deadline)
+            savedState.get<String>("editDraftId")?.let { repository.deleteDraft(it) }
+            savedState["editDraftId"] = null
+            editDraft.value = null
+            onDone()
+        } catch (error: RuntimeException) {
+            message.value = error.message
+        }
+    }
+
+    fun loadEditDraft() = viewModelScope.launch {
+        if (editDraft.value != null) return@launch
+        repository.drafts().asSequence().mapNotNull { stored ->
+            runCatching {
+                val json = JSONObject(stored.payloadJson)
+                if (json.optString("kind") != "MANUAL_CAMPAIGN") return@runCatching null
+                EditDraft(stored.id, json.optString("title"), json.optString("url"), json.optString("deadline"))
+            }.getOrNull()
+        }.firstOrNull()?.let {
+            savedState["editDraftId"] = it.id
+            editDraft.value = it
+        }
+    }
+
+    fun saveEditDraft(title: String, url: String, deadline: String) = viewModelScope.launch {
+        val id = savedState.get<String>("editDraftId") ?: UUID.randomUUID().toString().also { savedState["editDraftId"] = it }
+        val draft = EditDraft(id, title, url, deadline)
+        repository.saveDraft(id, JSONObject().put("kind", "MANUAL_CAMPAIGN").put("title", title).put("url", url).put("deadline", deadline).toString())
+        editDraft.value = draft
     }
 
     suspend fun prepareLaunch(campaignId: String, originRoute: String): LaunchSessionEntity? = runCatching {
@@ -54,15 +86,34 @@ class MainViewModel(
     }
 
     fun onActivityResumed() {
-        if (!externalPageObserved) return
-        val launchId = savedState.get<String>("pendingLaunchId") ?: return
-        val campaignId = savedState.get<String>("pendingLaunchCampaignId") ?: return
+        if (!externalPageObserved && confirmation.value != null) return
         viewModelScope.launch {
-            repository.card(campaignId)?.url?.let { url ->
-                confirmation.value = LaunchSessionEntity(launchId, campaignId, url.launchUrl, 0, "NEEDS_CONFIRMATION", "list", updatedAt = 0)
+            val launchId = savedState.get<String>("pendingLaunchId") ?: repository.pendingLaunches()
+                .filter { it.state in setOf("LAUNCHED", "NEEDS_CONFIRMATION") }
+                .lastOrNull()?.also {
+                savedState["pendingLaunchId"] = it.id
+                savedState["pendingLaunchCampaignId"] = it.campaignId
+            }?.id ?: return@launch
+            val launch = repository.launch(launchId)
+            if (launch != null && launch.state in setOf("LAUNCHED", "NEEDS_CONFIRMATION", "REVIEW_LATER")) {
+                confirmation.value = launch.copy(state = "NEEDS_CONFIRMATION")
+            } else if (launch == null || launch.confirmedEntryId != null || launch.state in setOf("NOT_APPLIED", "APPLIED")) {
+                clearPendingLaunch()
             }
         }
         externalPageObserved = false
+    }
+
+    fun failPendingLaunch() = viewModelScope.launch {
+        runCatching { savedState.get<String>("pendingLaunchId")?.let { repository.markNotApplied(it) } }
+        clearPendingLaunch()
+        message.value = "応募ページを開けませんでした。URLを確認してください。"
+    }
+
+    private fun clearPendingLaunch() {
+        confirmation.value = null
+        savedState["pendingLaunchId"] = null
+        savedState["pendingLaunchCampaignId"] = null
     }
 
     fun resolveConfirmation(action: String) = viewModelScope.launch {
@@ -74,9 +125,7 @@ class MainViewModel(
                 else -> repository.markLaunchForReview(launch.id)
             }
         }.onFailure { message.value = it.message }
-        confirmation.value = null
-        savedState["pendingLaunchId"] = null
-        savedState["pendingLaunchCampaignId"] = null
+        clearPendingLaunch()
     }
 
     fun clearMessage() { message.value = null }
