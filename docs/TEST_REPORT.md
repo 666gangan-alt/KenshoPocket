@@ -59,17 +59,17 @@
 
 OS通知の実配信、実機共有、Predictive Back完了/キャンセル、ブラウザ往復、プロセス再生成、通知権限拒否、画像/OCR、バックアップ復元、200%フォント、TalkBack、横画面は未実施。
 
-## 監査ループ現行結果（commit `13ae862`）
+## 監査ループ現行結果（commit `5ff17d4`）
 
 | 対象 | 結果 | 証拠 |
 |---|---|---|
 | 独立JVMドメイン試験 | PASS | `pwsh scripts/test-domain.ps1`、`OK (23 tests)` |
-| Windows `testDebugUnitTest` | 46 PASS / 1 FAIL | 47 tests中、`v1MigrationRetainsCampaignUrlDraftAndEntryAndValidatesRoomSchema`のみ`SQLiteCantOpenDatabaseException`。RobolectricのWindowsファイルアクセス環境依存として再現、合格扱いにしない |
-| GitHub Actions run #4 | PASS | [`36033413213`](https://github.com/666gangan-alt/KenshoPocket/actions/runs/36033413213)、`testDebugUnitTest lintDebug assembleDebug`成功 |
-| GitHub APK artifact | PASS | artifact `10823328089`、17,678,491 bytes、digest `sha256:3ea74d87431a0d6393ac3e39fda927da72355cf835ed4aa22a8f162f0af6eb8b`、2026-10-08まで有効 |
+| Windows `testDebugUnitTest` | 48 PASS / 1 FAIL | 49 tests中、`v1MigrationRetainsCampaignUrlDraftAndEntryAndValidatesRoomSchema`のみ`SQLiteCantOpenDatabaseException`。RobolectricのWindowsファイルアクセス環境依存として再現、合格扱いにしない |
+| GitHub Actions run #7 | PASS | [`36035266236`](https://github.com/666gangan-alt/KenshoPocket/actions/runs/36035266236)、`testDebugUnitTest lintDebug assembleDebug`成功 |
+| GitHub APK artifact | PASS | artifact `10824346410`、17,679,468 bytes、digest `sha256:c35418ff9e75c0f4a09e319df00307c5faed39907bc8e28ece4a6264693ebefb`、2026-10-08まで有効 |
 | Android instrumentation | SMOKEのみ | `connectedDebugAndroidTest`成功だがソース試験件数0。UI・通知の実機合格とは扱わない |
 | 静的監査 | PASS（Gradle除く） | `scripts/audit.ps1 -SkipGradle`: secretsなし、禁止追跡ファイルなし、`git diff --check`成功。PATHにJDKがないためGradle部分はBLOCKED |
-| Drive配布 | PASS | [KenshoPocket-debug-4-13ae862.apk](https://drive.google.com/file/d/1uMK3V11qnaox0WPDsd3Ukx79T9w5v76u/view?usp=drivesdk)、18,218,184 bytes、APK SHA-256 `37DC579A5B7E6FDB2C1DBA25EBA44B81B9ABAB0061B777E29059236C3A5FDF76` |
+| Drive配布 | PASS | [KenshoPocket-debug-7-5ff17d4.apk](https://drive.google.com/file/d/1gD-BcttmvQ1e3MXPC1yUGGRXBYWELhd8/view?usp=drivesdk)、18,234,568 bytes、APK SHA-256 `FD15BA3A328FE5F7E253CC2D8220101FDF04625D9DB8AC176193468B501F76FC` |
 
 ### 現行サイクルの残課題
 

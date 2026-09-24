@@ -6,9 +6,9 @@
 
 | 工程 | 状態 | 内容 |
 |---|---|---|
-| P0 | 自動試験済み | Androidプロジェクト、Compose、Room、Navigation、CI、Debug APK。GitHub Actions run #4でtest/lint/build成功 |
-| P1 | 実装済み／実機確認待ち | 手動登録、一覧、詳細、HTTPS起動、ブラウザ復帰確認、応募履歴。BackHandlerと下書き保存を実装、実機Back/ブラウザ往復は未試験 |
-| P2 | 実装済み／実機確認待ち | 非通信パーサー、共有UI、一括保存、候補編集・再生成復元、同一下書き操作の再試行冪等性を実装。共有実機フローは未試験 |
+| P0 | 自動試験済み | Androidプロジェクト、Compose、Room、Navigation、CI、Debug APK。GitHub Actions run #7でtest/lint/build成功 |
+| P1 | 実装済み／実機確認待ち | 手動登録、一覧、詳細、HTTPS起動、ブラウザ復帰確認、応募履歴。BackHandler、タブ移動抑制、下書き保存を実装、実機Back/ブラウザ往復は未試験 |
+| P2 | 実装済み／実機確認待ち | 非通信パーサー、共有UI、一括保存、候補編集・再生成復元、旧raw下書き互換、同一下書き操作の再試行冪等性を実装。共有実機フローは未試験 |
 | P3 | CI検証済み／実機確認待ち | Room通知設定・予定・履歴、AlarmManager、WorkManager、通知アクション、設定・診断UIを実装。GitHub Actionsで47 unit tests・Lint・APK生成成功。Windowsではmigrationテスト1件がSQLiteアクセス環境依存で失敗 |
 | P4〜P7 | 未着手 | 設計の実装計画に沿って継続 |
 
@@ -48,12 +48,13 @@ v1全体の完成とは扱わない。現在の配布物は検証待ちの0.2.0-
 
 ローカルWindowsではPATHにJDKがなく、Gradle監査はBLOCKED。GitHub ActionsのJDK 17 Ubuntu runnerで同一コミットの検証を行い、ローカル制約と製品CIの判定を分離する。
 
-GitHub-hosted Ubuntu runner用のリモート検証環境を`.github/workflows/android.yml`に構築済み。JDK 17、Gradle Wrapper検証、単体試験、Lint、Debug APK生成、APK／レポートArtifactsを定義した。run #4（commit `13ae862`）は成功し、APK SHA-256は`37DC579A5B7E6FDB2C1DBA25EBA44B81B9ABAB0061B777E29059236C3A5FDF76`。GitHub ActionsはNode/Ubuntu移行のwarningを表示するが、ビルド結果は成功。登録手順は`docs/GITHUB_REMOTE_BUILD.md`参照。
+GitHub-hosted Ubuntu runner用のリモート検証環境を`.github/workflows/android.yml`に構築済み。JDK 17、Gradle Wrapper検証、単体試験、Lint、Debug APK生成、APK／レポートArtifactsを定義した。run #7（commit `5ff17d4`）は成功し、APK SHA-256は`FD15BA3A328FE5F7E253CC2D8220101FDF04625D9DB8AC176193468B501F76FC`。GitHub ActionsはNode/Ubuntu移行のwarningを表示するが、ビルド結果は成功。登録手順は`docs/GITHUB_REMOTE_BUILD.md`参照。
 
 ## 監査ループの今回の成果
 
 - `fcfd213`: HTTPS候補の確認導線、監査スクリプト、6時間ループ文書を追加。
 - `883c3e8`: 共有／手動下書きの候補状態復元、起動セッションのプロセス再生成復元、応募確認の旧保留状態解消、通知予約境界、同一取込操作の再試行冪等性を追加。
 - `13ae862`: NavHostのシステム戻る／Predictive Backでも手動入力を保存するBackHandlerを追加。
+- `e93eaae` / `5ff17d4`: 子画面のタブ遷移による入力破棄を抑止し、タイトル未入力の部分入力、旧raw共有下書き、互換テストを追加。
 - 監査役サブエージェントは読み取り専用で再監査し、High指摘を修正後に`assembleDebug`・`lintDebug`・CIを再確認した。
-- CI生成APKはGoogle Driveの[KenshoPocket-debug-4-13ae862.apk](https://drive.google.com/file/d/1uMK3V11qnaox0WPDsd3Ukx79T9w5v76u/view?usp=drivesdk)へ保存済み（18,218,184 bytes）。
+- CI生成APKはGoogle Driveの[KenshoPocket-debug-7-5ff17d4.apk](https://drive.google.com/file/d/1gD-BcttmvQ1e3MXPC1yUGGRXBYWELhd8/view?usp=drivesdk)へ保存済み（18,234,568 bytes）。

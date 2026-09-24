@@ -8,7 +8,7 @@ LINE等の文章・URL・スクリーンショットから懸賞を登録し、�
 
 戻るジェスチャー、Predictive Back、入力途中の下書き、ブラウザから戻った時の一覧位置保持を最優先の仕様に含めた。
 
-Kotlin＋Compose＋Roomで実装したAndroidアプリです。GitHub Actions run #4で単体試験、Lint、Debug APK生成まで成功しています。実機通知、共有取込、ブラウザ往復、Predictive Back等は未完了のため、v1完成版ではなく検証待ち版として扱います。
+Kotlin＋Compose＋Roomで実装したAndroidアプリです。GitHub Actions run #7で単体試験、Lint、Debug APK生成まで成功しています。実機通知、共有取込、ブラウザ往復、Predictive Back等は未完了のため、v1完成版ではなく検証待ち版として扱います。
 
 ## ファイル一覧
 
@@ -48,4 +48,4 @@ example.invalidのURLには実通信しない。fixtureは完成済みテスト�
 
 ## 現時点の納品範囲
 
-手動登録、共有候補レビュー、HTTPS応募URL起動、応募確認、通知計画、入力下書き復元、監査ループ、CIを実装済み。最新APKは[Google Drive](https://drive.google.com/file/d/1uMK3V11qnaox0WPDsd3Ukx79T9w5v76u/view?usp=drivesdk)から取得できます。状態・試験結果・未実施範囲は[`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md)と[`docs/TEST_REPORT.md`](docs/TEST_REPORT.md)を参照してください。
+手動登録、共有候補レビュー、HTTPS応募URL起動、応募確認、通知計画、入力下書き復元、監査ループ、CIを実装済み。最新APKは[Google Drive](https://drive.google.com/file/d/1gD-BcttmvQ1e3MXPC1yUGGRXBYWELhd8/view?usp=drivesdk)から取得できます。状態・試験結果・未実施範囲は[`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md)と[`docs/TEST_REPORT.md`](docs/TEST_REPORT.md)を参照してください。
