@@ -50,14 +50,24 @@ if ($forbiddenFiles.Count -gt 0) {
 
 if ($SkipGradle) {
     $blocked.Add('Gradle検証はSkipGradle指定で未実行です。')
-} elseif (-not (Get-Command java -ErrorAction SilentlyContinue)) {
-    $blocked.Add('JDKがPATHにありません。Gradle検証を実行できません。')
 } else {
+    $java = Get-Command java -ErrorAction SilentlyContinue
+    if ($null -eq $java -and $env:JAVA_HOME) {
+        $javaHomeJava = Join-Path $env:JAVA_HOME 'bin\java.exe'
+        if (Test-Path -LiteralPath $javaHomeJava) {
+            $env:Path = "$(Split-Path -Parent $javaHomeJava);$env:Path"
+            $java = Get-Command java -ErrorAction SilentlyContinue
+        }
+    }
+    if ($null -eq $java) {
+        $blocked.Add('JDKがPATHまたはJAVA_HOMEにありません。Gradle検証を実行できません。')
+    } else {
     & cmd /c gradlew.bat testDebugUnitTest lintDebug assembleDebug --stacktrace --no-daemon
     if ($LASTEXITCODE -ne 0) {
         $findings.Add("Gradle検証が失敗しました（exit=$LASTEXITCODE）。ログを保存して原因を修正してください。")
     } else {
         Write-Output 'GRADLE=PASS'
+    }
     }
 }
 

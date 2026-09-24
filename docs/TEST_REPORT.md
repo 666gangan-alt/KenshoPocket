@@ -1,6 +1,8 @@
 # 試験報告
 
-実行日: 2026-09-23 / 環境: Windows、JDK 17.0.20.1、Android SDK 36
+実行日: 2026-09-25 / 環境: Windows（PATHにJDKなし）、GitHub-hosted Ubuntu、Android SDK 36
+
+> 先頭の旧記録は実装開始時点の履歴です。現在の判定は末尾の「監査ループ現行結果」を優先します。
 
 ## ビルド起動設定の修正後の確認
 
@@ -56,3 +58,21 @@
 ## 未実施
 
 OS通知の実配信、実機共有、Predictive Back完了/キャンセル、ブラウザ往復、プロセス再生成、通知権限拒否、画像/OCR、バックアップ復元、200%フォント、TalkBack、横画面は未実施。
+
+## 監査ループ現行結果（commit `13ae862`）
+
+| 対象 | 結果 | 証拠 |
+|---|---|---|
+| 独立JVMドメイン試験 | PASS | `pwsh scripts/test-domain.ps1`、`OK (23 tests)` |
+| Windows `testDebugUnitTest` | 46 PASS / 1 FAIL | 47 tests中、`v1MigrationRetainsCampaignUrlDraftAndEntryAndValidatesRoomSchema`のみ`SQLiteCantOpenDatabaseException`。RobolectricのWindowsファイルアクセス環境依存として再現、合格扱いにしない |
+| GitHub Actions run #4 | PASS | [`36033413213`](https://github.com/666gangan-alt/KenshoPocket/actions/runs/36033413213)、`testDebugUnitTest lintDebug assembleDebug`成功 |
+| GitHub APK artifact | PASS | artifact `10823328089`、17,678,491 bytes、digest `sha256:3ea74d87431a0d6393ac3e39fda927da72355cf835ed4aa22a8f162f0af6eb8b`、2026-10-08まで有効 |
+| Android instrumentation | SMOKEのみ | `connectedDebugAndroidTest`成功だがソース試験件数0。UI・通知の実機合格とは扱わない |
+| 静的監査 | PASS（Gradle除く） | `scripts/audit.ps1 -SkipGradle`: secretsなし、禁止追跡ファイルなし、`git diff --check`成功。PATHにJDKがないためGradle部分はBLOCKED |
+| Drive配布 | PASS | [KenshoPocket-debug-4-13ae862.apk](https://drive.google.com/file/d/1uMK3V11qnaox0WPDsd3Ukx79T9w5v76u/view?usp=drivesdk)、18,218,184 bytes、APK SHA-256 `37DC579A5B7E6FDB2C1DBA25EBA44B81B9ABAB0061B777E29059236C3A5FDF76` |
+
+### 現行サイクルの残課題
+
+- WindowsのRoom migrationテストを通すJDK／SQLiteファイル配置を整える。
+- Android端末で通知権限、再起動、Doze、省電力、共有取込、Predictive Back、ブラウザ往復を実測する。
+- GitHub ActionsのNode 20／Ubuntu 24移行warningは成功を妨げていないが、次の保守サイクルでactions／runnerを更新する。
