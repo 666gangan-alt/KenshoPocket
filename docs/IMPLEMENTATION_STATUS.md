@@ -7,9 +7,9 @@
 | 工程 | 状態 | 内容 |
 |---|---|---|
 | P0 | 自動試験済み | Androidプロジェクト、Compose、Room、Navigation、CI、Debug APK。GitHub Actions run #7でtest/lint/build成功 |
-| P1 | 実装済み／実機確認待ち | 手動登録、一覧、詳細、HTTPS起動、ブラウザ復帰確認、応募履歴。BackHandler、タブ移動抑制、下書き保存を実装、実機Back/ブラウザ往復は未試験 |
-| P2 | 実装済み／実機確認待ち | 非通信パーサー、共有UI、一括保存、候補編集・再生成復元、旧raw下書き互換、同一下書き操作の再試行冪等性を実装。共有実機フローは未試験 |
-| P3 | CI検証済み／実機確認待ち | Room通知設定・予定・履歴、AlarmManager、WorkManager、通知アクション、設定・診断UIを実装。GitHub Actionsで47 unit tests・Lint・APK生成成功。Windowsではmigrationテスト1件がSQLiteアクセス環境依存で失敗 |
+| P1 | 新規登録実装済み／既存編集・実機確認待ち | 手動登録、一覧、詳細、HTTPS起動、ブラウザ復帰確認、応募履歴。BackHandler、タブ移動抑制、下書き保存を実装。既存キャンペーンのURL・締切・周期編集導線と実機Back/ブラウザ往復は未実装／未試験 |
+| P2 | 実装済み／実機確認待ち | 非通信パーサー、共有UI、一括保存、候補のタイトル・締切・選択編集、再生成復元、旧raw下書き互換、同一下書き操作の再試行冪等性を実装。候補URL・周期の編集UIは次工程、共有実機フローは未試験 |
+| P3 | CI検証済み／実機確認待ち | Room通知設定・予定・履歴、AlarmManager、WorkManager、通知アクション、設定・診断UIを実装。GitHub Actionsで49 unit tests・Lint・APK生成成功。Windowsではmigrationテスト1件がSQLiteアクセス環境依存で失敗 |
 | P4〜P7 | 未着手 | 設計の実装計画に沿って継続 |
 
 ## 機能
@@ -40,7 +40,7 @@
 
 ## 次の検証／残作業
 
-1. WindowsのRobolectric migrationテストでSQLiteファイル作成環境を直し、47件をローカルでも全件成功させる。
+1. WindowsのRobolectric migrationテストでSQLiteファイル作成環境を直し、49件をローカルでも全件成功させる。
 2. 実機で通知許可／拒否、再起動、Doze、通知アクション、システム戻る／共有取込／ブラウザ往復を試験する。
 3. 独立した確認リマインダー、周期モード・開始曜日・リセット時刻の編集UI、賞品期限通知は未実装。
 

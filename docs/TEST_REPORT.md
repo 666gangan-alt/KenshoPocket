@@ -75,4 +75,6 @@ OS通知の実配信、実機共有、Predictive Back完了/キャンセル、�
 
 - WindowsのRoom migrationテストを通すJDK／SQLiteファイル配置を整える。
 - Android端末で通知権限、再起動、Doze、省電力、共有取込、Predictive Back、ブラウザ往復を実測する。
+- 既存キャンペーンのURL・締切・周期を編集する導線を追加する（現在の`edit`画面は新規登録専用）。
+- 共有候補のURL／周期編集UIを追加し、HTTP・OCR・推測URLをユーザーが安全なHTTPSへ修正できるようにする（現状は安全側にreviewRequiredで保存）。
 - GitHub ActionsのNode 20／Ubuntu 24移行warningは成功を妨げていないが、次の保守サイクルでactions／runnerを更新する。
