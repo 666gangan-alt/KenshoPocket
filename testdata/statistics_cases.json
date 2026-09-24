@@ -1,0 +1,172 @@
+{
+  "schemaVersion": 1,
+  "description": "集計ルール用架空データ。IDはfixture内の別名であり実装時にUUIDへ変換可能。",
+  "cases": [
+    {
+      "id": "STAT01",
+      "label": "複数賞品・未判明・単独当選・無効記録を区別",
+      "cohort": {
+        "from": "2026-09-01",
+        "toExclusive": "2026-10-01",
+        "zoneId": "Asia/Tokyo"
+      },
+      "entries": [
+        {
+          "id": "e1",
+          "campaignId": "c1",
+          "appliedAt": "2026-09-01T00:00:00Z",
+          "result": "WIN",
+          "voided": false
+        },
+        {
+          "id": "e2",
+          "campaignId": "c1",
+          "appliedAt": "2026-09-02T00:00:00Z",
+          "result": "LOSE",
+          "voided": false
+        },
+        {
+          "id": "e3",
+          "campaignId": "c2",
+          "appliedAt": "2026-09-03T00:00:00Z",
+          "result": "PENDING",
+          "voided": false
+        },
+        {
+          "id": "e4",
+          "campaignId": "c2",
+          "appliedAt": "2026-09-04T00:00:00Z",
+          "result": "UNKNOWN",
+          "voided": false
+        },
+        {
+          "id": "e5",
+          "campaignId": "c3",
+          "appliedAt": "2026-09-05T00:00:00Z",
+          "result": "WIN",
+          "voided": false
+        },
+        {
+          "id": "e6",
+          "campaignId": "c4",
+          "appliedAt": "2026-09-06T00:00:00Z",
+          "result": "WIN",
+          "voided": true
+        }
+      ],
+      "wins": [
+        {
+          "id": "w1",
+          "entryId": "e1",
+          "wonOn": "2026-09-10",
+          "estimatedValueYen": 500,
+          "receiveStatus": "RECEIVED"
+        },
+        {
+          "id": "w2",
+          "entryId": "e1",
+          "wonOn": "2026-09-10",
+          "estimatedValueYen": null,
+          "pointsQuantity": 5,
+          "receiveStatus": "RECEIVED"
+        },
+        {
+          "id": "w3",
+          "entryId": "e5",
+          "wonOn": "2026-09-20",
+          "estimatedValueYen": 1000,
+          "receiveStatus": "CLAIMED"
+        },
+        {
+          "id": "w4",
+          "entryId": null,
+          "wonOn": "2026-09-21",
+          "estimatedValueYen": 300,
+          "receiveStatus": "RECEIVED"
+        }
+      ],
+      "expected": {
+        "entryCount": 5,
+        "distinctCampaignCount": 3,
+        "winningEntryCount": 2,
+        "losingEntryCount": 1,
+        "pendingCount": 1,
+        "unknownCount": 1,
+        "knownResultDenominator": 3,
+        "winRatioRounded1Decimal": "66.7%",
+        "winRecordCount": 4,
+        "knownValueYen": 1800,
+        "receivedKnownValueYen": 800,
+        "unvaluedWinRecordCount": 1
+      }
+    },
+    {
+      "id": "STAT02",
+      "label": "当選月と応募月を混ぜない",
+      "cohort": {
+        "from": "2026-09-01",
+        "toExclusive": "2026-10-01",
+        "zoneId": "Asia/Tokyo"
+      },
+      "entries": [
+        {
+          "id": "a1",
+          "campaignId": "c1",
+          "appliedAt": "2026-08-20T00:00:00Z",
+          "result": "WIN",
+          "voided": false
+        },
+        {
+          "id": "s1",
+          "campaignId": "c2",
+          "appliedAt": "2026-09-02T00:00:00Z",
+          "result": "PENDING",
+          "voided": false
+        }
+      ],
+      "wins": [
+        {
+          "id": "w1",
+          "entryId": "a1",
+          "wonOn": "2026-09-10",
+          "estimatedValueYen": 1000,
+          "receiveStatus": "RECEIVED"
+        }
+      ],
+      "expected": {
+        "entryCount": 1,
+        "winningEntryCount": 0,
+        "knownResultDenominator": 0,
+        "winRatioRounded1Decimal": "—",
+        "winRecordCountInWinMonth": 1
+      }
+    },
+    {
+      "id": "STAT03",
+      "label": "単独当選から架空の応募件数を作らない",
+      "cohort": {
+        "from": "2026-09-01",
+        "toExclusive": "2026-10-01",
+        "zoneId": "Asia/Tokyo"
+      },
+      "entries": [],
+      "wins": [
+        {
+          "id": "w1",
+          "entryId": null,
+          "wonOn": "2026-09-10",
+          "estimatedValueYen": null,
+          "receiveStatus": "RECEIVED"
+        }
+      ],
+      "expected": {
+        "entryCount": 0,
+        "knownResultDenominator": 0,
+        "winRatioRounded1Decimal": "—",
+        "winRecordCount": 1,
+        "knownValueYen": 0,
+        "unvaluedWinRecordCount": 1
+      }
+    }
+  ]
+}

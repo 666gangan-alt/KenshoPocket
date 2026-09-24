@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "description": "純粋な通知計画／配信判定／周期計算用。OSでの実配信保証のテストではない。",
+  "cases": [
+    {
+      "id": "REM01",
+      "operation": "planDeadlineReminders",
+      "now": "2026-09-23T02:32:00Z",
+      "deadline": {
+        "precision": "DATE_ONLY",
+        "date": "2026-09-27",
+        "time": null,
+        "zoneId": "Asia/Tokyo",
+        "confirmed": true
+      },
+      "dayOffsets": [
+        -3,
+        -1,
+        0
+      ],
+      "localTime": "09:00",
+      "minutesBefore": [],
+      "expectedPlannedAt": [
+        "2026-09-24T00:00:00Z",
+        "2026-09-26T00:00:00Z",
+        "2026-09-27T00:00:00Z"
+      ],
+      "expectedPrecisionWarning": "TIME_UNKNOWN"
+    },
+    {
+      "id": "REM02",
+      "operation": "planDeadlineReminders",
+      "now": "2026-09-23T02:32:00Z",
+      "deadline": {
+        "precision": "DATE_TIME",
+        "date": "2026-09-27",
+        "time": "07:00",
+        "zoneId": "Asia/Tokyo",
+        "confirmed": true
+      },
+      "dayOffsets": [
+        -3,
+        -1,
+        0
+      ],
+      "localTime": "09:00",
+      "minutesBefore": [
+        120
+      ],
+      "expectedPlannedAt": [
+        "2026-09-24T00:00:00Z",
+        "2026-09-26T00:00:00Z",
+        "2026-09-26T20:00:00Z"
+      ],
+      "mustNotInclude": [
+        "2026-09-27T00:00:00Z"
+      ]
+    },
+    {
+      "id": "REM03",
+      "operation": "planDeadlineReminders",
+      "now": "2026-09-23T02:32:00Z",
+      "deadline": {
+        "precision": "DATE_TIME",
+        "date": "2026-09-23",
+        "time": "09:59",
+        "zoneId": "Asia/Tokyo",
+        "confirmed": true
+      },
+      "dayOffsets": [
+        -3,
+        -1,
+        0
+      ],
+      "localTime": "09:00",
+      "minutesBefore": [
+        120
+      ],
+      "expectedPlannedAt": []
+    },
+    {
+      "id": "REM04",
+      "operation": "planDeadlineReminders",
+      "now": "2026-09-23T02:32:00Z",
+      "deadline": {
+        "precision": "DATE_ONLY",
+        "date": "2027-01-10",
+        "time": null,
+        "zoneId": "Asia/Tokyo",
+        "confirmed": false
+      },
+      "dayOffsets": [
+        -3,
+        -1,
+        0
+      ],
+      "localTime": "09:00",
+      "minutesBefore": [],
+      "expectedPlannedAt": [],
+      "expectedReason": "UNCONFIRMED_DEADLINE"
+    },
+    {
+      "id": "REM05",
+      "operation": "nextRepeatingReminder",
+      "now": "2026-09-22T23:00:00Z",
+      "rule": {
+        "mode": "DAILY",
+        "zoneId": "Asia/Tokyo",
+        "resetTime": "00:00",
+        "remindTime": "09:00",
+        "confirmed": true
+      },
+      "activeApplications": [],
+      "expectedNextAt": "2026-09-23T00:00:00Z"
+    },
+    {
+      "id": "REM06",
+      "operation": "nextRepeatingReminder",
+      "now": "2026-09-22T23:00:00Z",
+      "rule": {
+        "mode": "DAILY",
+        "zoneId": "Asia/Tokyo",
+        "resetTime": "00:00",
+        "remindTime": "09:00",
+        "confirmed": true
+      },
+      "activeApplications": [
+        "2026-09-22T22:00:00Z"
+      ],
+      "expectedNextAt": "2026-09-24T00:00:00Z",
+      "mustNotInclude": [
+        "2026-09-23T00:00:00Z"
+      ]
+    },
+    {
+      "id": "REM07",
+      "operation": "evaluateDispatch",
+      "now": "2026-09-27T00:15:00Z",
+      "scheduledAt": "2026-09-27T00:00:00Z",
+      "validUntil": "2026-09-26T22:00:00Z",
+      "purpose": "APPLICATION",
+      "appliedInPeriod": false,
+      "permissionGranted": true,
+      "expected": "SKIPPED_EXPIRED"
+    },
+    {
+      "id": "REM08",
+      "operation": "evaluateDispatch",
+      "now": "2026-09-23T00:00:00Z",
+      "scheduledAt": "2026-09-23T00:00:00Z",
+      "validUntil": "2026-09-23T15:00:00Z",
+      "purpose": "REPEAT_ENTRY",
+      "appliedInPeriod": true,
+      "permissionGranted": true,
+      "expected": "SKIPPED_ALREADY_APPLIED"
+    },
+    {
+      "id": "REM09",
+      "operation": "applyQuietHours",
+      "plannedAt": "2026-09-23T14:00:00Z",
+      "validUntil": "2026-09-23T15:00:00Z",
+      "zoneId": "Asia/Tokyo",
+      "quietStart": "22:00",
+      "quietEnd": "08:00",
+      "expectedEffectiveAt": null,
+      "expectedReason": "SKIPPED_QUIET_WINDOW"
+    },
+    {
+      "id": "REM10",
+      "operation": "calculatePeriod",
+      "at": "2026-09-23T21:30:00Z",
+      "rule": {
+        "mode": "DAILY",
+        "zoneId": "Asia/Tokyo",
+        "resetTime": "07:00"
+      },
+      "expectedStart": "2026-09-22T22:00:00Z",
+      "expectedEnd": "2026-09-23T22:00:00Z"
+    },
+    {
+      "id": "REM11",
+      "operation": "evaluateDispatch",
+      "now": "2026-09-23T00:00:00Z",
+      "scheduledAt": "2026-09-23T00:00:00Z",
+      "validUntil": "2026-09-24T15:00:00Z",
+      "purpose": "APPLICATION",
+      "appliedInPeriod": false,
+      "permissionGranted": false,
+      "expected": "BLOCKED_PERMISSION"
+    },
+    {
+      "id": "REM12",
+      "operation": "evaluateDispatch",
+      "now": "2026-09-23T00:00:00Z",
+      "scheduledAt": "2026-09-23T00:00:00Z",
+      "validUntil": "2026-09-24T15:00:00Z",
+      "purpose": "RECEIVE",
+      "received": true,
+      "permissionGranted": true,
+      "expected": "SKIPPED_RECEIVED"
+    }
+  ]
+}

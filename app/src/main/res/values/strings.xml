@@ -1,0 +1,20 @@
+<resources>
+    <string name="app_name">懸賞Pocket</string>
+    <string name="today">今日</string>
+    <string name="campaigns">一覧</string>
+    <string name="wins">当選</string>
+    <string name="more">その他</string>
+    <string name="add_campaign">懸賞を登録</string>
+    <string name="campaign_title">懸賞名</string>
+    <string name="application_url">応募URL</string>
+    <string name="deadline">締切（任意）</string>
+    <string name="save">保存</string>
+    <string name="open_application">応募ページへ</string>
+    <string name="url_missing">URLを追加</string>
+    <string name="no_campaigns">登録された懸賞はありません</string>
+    <string name="confirm_applied">応募は完了しましたか？</string>
+    <string name="applied">応募済みにする</string>
+    <string name="not_applied">まだ</string>
+    <string name="review_later">あとで確認</string>
+    <string name="draft_saved">下書き保存済み</string>
+</resources>

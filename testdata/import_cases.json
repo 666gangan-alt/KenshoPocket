@@ -1,0 +1,370 @@
+{
+  "schemaVersion": 1,
+  "description": "候補パーサー用の架空データ。URLへ実通信しない。期待値は指定フィールドのみ照合。",
+  "cases": [
+    {
+      "id": "IMP01",
+      "label": "画像例に近い複数件文章・実在URLは使用しない",
+      "sourceKind": "SHARED_TEXT",
+      "referenceInstant": "2026-09-23T02:32:00Z",
+      "zoneId": "Asia/Tokyo",
+      "networkAllowed": false,
+      "inputText": "《その他抽選》\n\nお茶A くじは終わり\n（ポイント 5P貰えます）11/4\n9時59分まで\nhttps://example.invalid/tea-a\n\nジュースB 11/30\nhttps://example.invalid/juice-b\n\n紅茶C 1/10\nhttps://example.invalid/tea-c\n\n麦茶D 9/27\nhttps://example.invalid/tea-d\n\nエナジーE 12/27\nhttps://example.invalid/energy-e\n\nコラボF 10/11\nhttps://example.invalid/collab-f",
+      "expectedCandidateCount": 6,
+      "expected": {
+        "allDeadlineConfirmed": false,
+        "candidateAssertions": [
+          {
+            "index": 0,
+            "titleContains": "お茶A",
+            "warningsInclude": [
+              "YEAR_MISSING",
+              "ENDED_MENTION",
+              "BENEFIT_TYPE_AMBIGUOUS"
+            ],
+            "dateCandidate": "2026-11-04",
+            "timeCandidate": "09:59"
+          },
+          {
+            "index": 1,
+            "titleContains": "ジュースB",
+            "dateCandidate": "2026-11-30"
+          },
+          {
+            "index": 2,
+            "titleContains": "紅茶C",
+            "dateCandidate": "2027-01-10",
+            "warningsInclude": [
+              "YEAR_MISSING"
+            ]
+          },
+          {
+            "index": 3,
+            "titleContains": "麦茶D",
+            "dateCandidate": "2026-09-27"
+          },
+          {
+            "index": 4,
+            "titleContains": "エナジーE",
+            "dateCandidate": "2026-12-27"
+          },
+          {
+            "index": 5,
+            "titleContains": "コラボF",
+            "dateCandidate": "2026-10-11"
+          }
+        ]
+      }
+    },
+    {
+      "id": "IMP02",
+      "label": "年またぎは候補止まり",
+      "sourceKind": "SHARED_TEXT",
+      "referenceInstant": "2026-09-23T02:32:00Z",
+      "zoneId": "Asia/Tokyo",
+      "networkAllowed": false,
+      "inputText": "紅茶 1/10\nhttps://example.invalid/january",
+      "expectedCandidateCount": 1,
+      "expected": {
+        "candidateAssertions": [
+          {
+            "index": 0,
+            "dateCandidate": "2027-01-10",
+            "deadlineConfirmed": false,
+            "warningsInclude": [
+              "YEAR_MISSING"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "IMP03",
+      "label": "直前の過去日を翌年へ書き換えない",
+      "sourceKind": "SHARED_TEXT",
+      "referenceInstant": "2026-09-23T02:32:00Z",
+      "zoneId": "Asia/Tokyo",
+      "networkAllowed": false,
+      "inputText": "昨日締切の可能性 9/22\nhttps://example.invalid/past",
+      "expectedCandidateCount": 1,
+      "expected": {
+        "candidateAssertions": [
+          {
+            "index": 0,
+            "dateCandidate": "2026-09-22",
+            "deadlineConfirmed": false,
+            "warningsInclude": [
+              "YEAR_MISSING",
+              "PAST_DATE_CANDIDATE"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "IMP04",
+      "label": "日付・時刻の抽出とユーザー確認は別",
+      "sourceKind": "SHARED_TEXT",
+      "referenceInstant": "2026-09-23T02:32:00Z",
+      "zoneId": "Asia/Tokyo",
+      "networkAllowed": false,
+      "inputText": "抽選 2026/11/4 9時59分まで\nhttps://example.invalid/timed",
+      "expectedCandidateCount": 1,
+      "expected": {
+        "candidateAssertions": [
+          {
+            "index": 0,
+            "dateCandidate": "2026-11-04",
+            "timeCandidate": "09:59",
+            "deadlineConfirmed": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "IMP05",
+      "label": "存在しない日付を丸めない",
+      "sourceKind": "SHARED_TEXT",
+      "referenceInstant": "2026-09-23T02:32:00Z",
+      "zoneId": "Asia/Tokyo",
+      "networkAllowed": false,
+      "inputText": "秋の抽選 2026/9/31\nhttps://example.invalid/invalid-date",
+      "expectedCandidateCount": 1,
+      "expected": {
+        "candidateAssertions": [
+          {
+            "index": 0,
+            "dateCandidate": null,
+            "warningsInclude": [
+              "INVALID_DATE"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "IMP06",
+      "label": "存在しないうるう日",
+      "sourceKind": "SHARED_TEXT",
+      "referenceInstant": "2026-09-23T02:32:00Z",
+      "zoneId": "Asia/Tokyo",
+      "networkAllowed": false,
+      "inputText": "抽選 2026/2/29\nhttps://example.invalid/leap",
+      "expectedCandidateCount": 1,
+      "expected": {
+        "candidateAssertions": [
+          {
+            "index": 0,
+            "dateCandidate": null,
+            "warningsInclude": [
+              "INVALID_DATE"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "IMP07",
+      "label": "全角日付とURL内大文字の保持",
+      "sourceKind": "SHARED_TEXT",
+      "referenceInstant": "2026-09-23T02:32:00Z",
+      "zoneId": "Asia/Tokyo",
+      "networkAllowed": false,
+      "inputText": "飲料 ２０２６／１１／３０\nhttps://example.invalid/AbC?Token=AbC%2F1#Form",
+      "expectedCandidateCount": 1,
+      "expected": {
+        "candidateAssertions": [
+          {
+            "index": 0,
+            "dateCandidate": "2026-11-30",
+            "launchUrlCandidate": "https://example.invalid/AbC?Token=AbC%2F1#Form"
+          }
+        ]
+      }
+    },
+    {
+      "id": "IMP08",
+      "label": "スキーム補完は要確認",
+      "sourceKind": "SHARED_TEXT",
+      "referenceInstant": "2026-09-23T02:32:00Z",
+      "zoneId": "Asia/Tokyo",
+      "networkAllowed": false,
+      "inputText": "企画 11/30\nexample.invalid/path",
+      "expectedCandidateCount": 1,
+      "expected": {
+        "candidateAssertions": [
+          {
+            "index": 0,
+            "launchUrlCandidate": "https://example.invalid/path",
+            "urlReviewRequired": true,
+            "warningsInclude": [
+              "SCHEME_ADDED"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "IMP09",
+      "label": "同ブロックの複数URLは関連候補",
+      "sourceKind": "SHARED_TEXT",
+      "referenceInstant": "2026-09-23T02:32:00Z",
+      "zoneId": "Asia/Tokyo",
+      "networkAllowed": false,
+      "inputText": "企画 2026/11/30\n公式案内 https://example.invalid/info\n応募 https://example.invalid/apply",
+      "expectedCandidateCount": 1,
+      "expected": {
+        "candidateAssertions": [
+          {
+            "index": 0,
+            "relatedUrlCount": 2,
+            "launchUrlCandidate": "https://example.invalid/apply"
+          }
+        ]
+      }
+    },
+    {
+      "id": "IMP10",
+      "label": "リンクプレビューの同一URL重複",
+      "sourceKind": "SHARED_TEXT",
+      "referenceInstant": "2026-09-23T02:32:00Z",
+      "zoneId": "Asia/Tokyo",
+      "networkAllowed": false,
+      "inputText": "企画 2026/11/30\nhttps://example.invalid/one\n\nリンクプレビュー\nhttps://example.invalid/one",
+      "expectedCandidateCount": 1,
+      "expected": {
+        "candidateAssertions": [
+          {
+            "index": 0,
+            "relatedUrlCount": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "IMP11",
+      "label": "OCR URLは勝手に文字訂正しない",
+      "sourceKind": "OCR",
+      "referenceInstant": "2026-09-23T02:32:00Z",
+      "zoneId": "Asia/Tokyo",
+      "networkAllowed": false,
+      "inputText": "お茶 11/30\nhttps://example.invalid/O0Il1",
+      "expectedCandidateCount": 1,
+      "expected": {
+        "candidateAssertions": [
+          {
+            "index": 0,
+            "launchUrlCandidate": "https://example.invalid/O0Il1",
+            "urlReviewRequired": true,
+            "warningsInclude": [
+              "OCR_URL_REVIEW"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "IMP12",
+      "label": "危険なスキームを開かない",
+      "sourceKind": "SHARED_TEXT",
+      "referenceInstant": "2026-09-23T02:32:00Z",
+      "zoneId": "Asia/Tokyo",
+      "networkAllowed": false,
+      "inputText": "企画\njavascript:alert(1)",
+      "expectedCandidateCount": 1,
+      "expected": {
+        "candidateAssertions": [
+          {
+            "index": 0,
+            "launchUrlCandidate": null,
+            "warningsInclude": [
+              "UNSUPPORTED_URL_SCHEME"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "IMP13",
+      "label": "応募期間と発表日を区別",
+      "sourceKind": "SHARED_TEXT",
+      "referenceInstant": "2026-09-23T02:32:00Z",
+      "zoneId": "Asia/Tokyo",
+      "networkAllowed": false,
+      "inputText": "企画\n応募期間 2026/9/1〜2026/9/30\n当選発表 2026/10/10\nhttps://example.invalid/range",
+      "expectedCandidateCount": 1,
+      "expected": {
+        "candidateAssertions": [
+          {
+            "index": 0,
+            "dateCandidate": "2026-09-30",
+            "notDeadline": "2026-10-10",
+            "deadlineConfirmed": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "IMP14",
+      "label": "24時間ごとを毎日0時更新にしない",
+      "sourceKind": "SHARED_TEXT",
+      "referenceInstant": "2026-09-23T02:32:00Z",
+      "zoneId": "Asia/Tokyo",
+      "networkAllowed": false,
+      "inputText": "抽選 24時間ごとに応募可能\nhttps://example.invalid/rolling",
+      "expectedCandidateCount": 1,
+      "expected": {
+        "candidateAssertions": [
+          {
+            "index": 0,
+            "entryModeCandidate": "MANUAL",
+            "warningsInclude": [
+              "ROLLING_INTERVAL_UNSUPPORTED"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "IMP15",
+      "label": "URLだけでも候補にする",
+      "sourceKind": "SHARED_TEXT",
+      "referenceInstant": "2026-09-23T02:32:00Z",
+      "zoneId": "Asia/Tokyo",
+      "networkAllowed": false,
+      "inputText": "https://example.invalid/url-only",
+      "expectedCandidateCount": 1,
+      "expected": {
+        "candidateAssertions": [
+          {
+            "index": 0,
+            "dateCandidate": null,
+            "deadlineConfirmed": false,
+            "titleRequiresReview": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "IMP16",
+      "label": "相対日付は原文作成時刻が分からない",
+      "sourceKind": "SHARED_TEXT",
+      "referenceInstant": "2026-09-23T02:32:00Z",
+      "zoneId": "Asia/Tokyo",
+      "networkAllowed": false,
+      "inputText": "今日まで\nhttps://example.invalid/relative",
+      "expectedCandidateCount": 1,
+      "expected": {
+        "candidateAssertions": [
+          {
+            "index": 0,
+            "deadlineConfirmed": false,
+            "warningsInclude": [
+              "RELATIVE_DATE_UNCERTAIN"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
