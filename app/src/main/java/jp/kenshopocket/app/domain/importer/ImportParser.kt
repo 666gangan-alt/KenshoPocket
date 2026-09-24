@@ -156,6 +156,7 @@ class ImportParser(private val clock: Clock = Clock.systemUTC()) {
         val withScheme = if (clean.startsWith("http://", true) || clean.startsWith("https://", true)) clean else "https://$clean"
         val warnings = linkedSetOf<String>()
         if (withScheme != clean) warnings += "SCHEME_ADDED"
+        if (withScheme.startsWith("http://", ignoreCase = true)) warnings += "INSECURE_HTTP_REVIEW"
         val uri = runCatching { URI(withScheme) }.getOrNull()
         if (uri == null || uri.host == null || uri.userInfo != null || (!uri.scheme.equals("https", true) && !uri.scheme.equals("http", true))) return null to setOf("UNSUPPORTED_URL_SCHEME")
         if (sourceKind == SourceKind.OCR) warnings += "OCR_URL_REVIEW"

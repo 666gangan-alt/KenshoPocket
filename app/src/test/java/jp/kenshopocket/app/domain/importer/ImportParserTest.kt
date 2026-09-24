@@ -85,6 +85,13 @@ class ImportParserTest {
         assertTrue("OCR_URL_REVIEW" in ocr.warnings)
     }
 
+    @Test fun httpUrlRemainsCandidateButRequiresReview() {
+        val value = parse("企画 11/30\nhttp://example.invalid/apply").single()
+        assertEquals("http://example.invalid/apply", value.launchUrlCandidate)
+        assertTrue(value.urlReviewRequired)
+        assertTrue("INSECURE_HTTP_REVIEW" in value.warnings)
+    }
+
     @Test fun relatedUrlsAndDuplicates() {
         val related = parse("企画 2026/11/30\n公式案内 https://example.invalid/info\n応募 https://example.invalid/apply").single()
         assertEquals(2, related.relatedUrls.size)

@@ -83,7 +83,10 @@ class CampaignRepository(private val db: AppDatabase, private val clock: Clock =
                         originalUrl = value,
                         launchUrl = value,
                         dedupeKey = value.lowercase(),
-                        reviewRequired = candidate.urlReviewRequired,
+                        // HTTP is retained as a candidate for user editing, but it must never
+                        // appear launchable. Keep this guard here as well as in the parser so
+                        // callers constructing ImportCandidate directly get the same safety.
+                        reviewRequired = candidate.urlReviewRequired || value.startsWith("http://", ignoreCase = true),
                         role = if (isPrimary) "APPLY" else "OTHER",
                         createdAt = now + urlIndex,
                     ))

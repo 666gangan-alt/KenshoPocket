@@ -34,6 +34,15 @@ class ShareImportActivity : ComponentActivity() {
         sharedText = savedInstanceState?.getString("sharedText")
             ?: if (intent.action == Intent.ACTION_SEND) intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty().take(200_000) else ""
         setContent { MaterialTheme { ImportContent() } }
+        if (savedInstanceState == null && intent.action != Intent.ACTION_SEND && sharedText.isBlank()) {
+            lifecycleScope.launch {
+                val draft = (application as KenshoPocketApplication).repository.latestDraft()
+                if (draft != null && sharedText.isBlank()) {
+                    draftId = draft.id
+                    sharedText = draft.payloadJson.take(200_000)
+                }
+            }
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

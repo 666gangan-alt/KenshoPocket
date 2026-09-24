@@ -11,6 +11,7 @@
     <string name="save">保存</string>
     <string name="open_application">応募ページへ</string>
     <string name="url_missing">URLを追加</string>
+    <string name="url_review_required">応募URLを確認</string>
     <string name="no_campaigns">登録された懸賞はありません</string>
     <string name="confirm_applied">応募は完了しましたか？</string>
     <string name="applied">応募済みにする</string>

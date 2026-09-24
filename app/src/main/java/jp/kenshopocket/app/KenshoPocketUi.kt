@@ -157,8 +157,11 @@ private fun CampaignCardView(card: CampaignCard, detail: () -> Unit, open: suspe
             Text(card.campaign.title, style = MaterialTheme.typography.titleMedium)
             Text(if (!card.campaign.deadlineConfirmed && card.campaign.deadlineDate != null) stringResource(R.string.reminder_date_candidate, card.campaign.deadlineDate) else card.campaign.deadlineDate?.let { "$it 締切" } ?: "締切未設定・要確認")
             Text(when { card.pendingConfirmation -> "応募完了の確認待ち"; card.entryCount > 0 -> "応募済み"; else -> "未応募" })
-            if (card.url != null) Button(onClick = { scope.launch { open() } }, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text(stringResource(R.string.open_application)) }
-            else TextButton(onClick = detail) { Text(stringResource(R.string.url_missing)) }
+            when {
+                card.url == null -> TextButton(onClick = detail) { Text(stringResource(R.string.url_missing)) }
+                card.url.reviewRequired -> TextButton(onClick = detail) { Text(stringResource(R.string.url_review_required)) }
+                else -> Button(onClick = { scope.launch { open() } }, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text(stringResource(R.string.open_application)) }
+            }
         }
     }
 }
